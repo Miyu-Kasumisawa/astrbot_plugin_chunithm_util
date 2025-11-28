@@ -6,7 +6,7 @@ from astrbot.api.star import Context, Star, register
 from astrbot.api import logger, AstrBotConfig
 import astrbot.api.message_components as Comp
 
-from ..main import Config
+from ..config import Config
 from .utils import songmeta
 
 SCRIPT_SONGMETA_PATH = os.path.join(os.path.dirname(__file__), "utils", "songmeta.py")

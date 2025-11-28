@@ -7,7 +7,7 @@ from astrbot.api.star import Context, Star, register
 from astrbot.api import logger, AstrBotConfig
 import astrbot.api.message_components as Comp
 
-from ..main import Config
+from ..config import Config
 from .query_song import searchSong
 from .utils.wechartutil import WEChartUtil
 

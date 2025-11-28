@@ -6,7 +6,7 @@ from astrbot.api.star import Context, Star, register
 from astrbot.api import logger, AstrBotConfig
 import astrbot.api.message_components as Comp
 
-from ..main import Config
+from ..config import Config
 from .utils.apicaller import *
 
 SONGS_PATH = os.path.join(Config.DATA_PATH, Config.SONG_PATH)
