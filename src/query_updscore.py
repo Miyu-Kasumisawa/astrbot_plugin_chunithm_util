@@ -1,20 +1,20 @@
 import os
 import json
-import dotenv
 import sqlite3
 
-from pkg.plugin.context import EventContext
-from pkg.plugin.events import *  # 导入事件类
-from pkg.platform.types import *
+from astrbot.api.event import filter, AstrMessageEvent, MessageEventResult
+from astrbot.api.star import Context, Star, register
+from astrbot.api import logger, AstrBotConfig
+import astrbot.api.message_components as Comp
 
+from ..main import Config
 from .query_song import searchSong
 from .utils.songutil import SongUtil
 
-dotenv.load_dotenv()
-SONGS_PATH = os.path.join(os.path.dirname(__file__), "..", os.getenv("SONG_PATH"))
+SONGS_PATH = os.path.join(Config.DATA_PATH, Config.SONG_PATH)
 DB_PATH = os.path.join(os.path.dirname(__file__), "..", 'data', 'data.db')
 
-def updateScore(user_id: str, cid: str, score: int, difficulty: int, name: str) -> None:
+def updateScore(user_id: str, cid: str, score: int, difficulty: int, name: str) -> tuple[int, str]:
     '''更新歌曲分数'''
     try:
         conn = sqlite3.connect(DB_PATH)
@@ -29,7 +29,7 @@ def updateScore(user_id: str, cid: str, score: int, difficulty: int, name: str) 
         return -1, f"更新失败：{e}"
     
 
-async def queryUpdScore(ctx: EventContext, args: list) -> None:
+async def queryUpdScore(event: AstrMessageEvent, score: int, name: str, difficulty: str):
     '''更新歌曲分数
     
     Args:
@@ -38,51 +38,54 @@ async def queryUpdScore(ctx: EventContext, args: list) -> None:
     Returns:
         None: 无返回值
     '''
-    score, name, difficulty = args
-    score = int(score)
     name = name.strip()
-    user_id = str(ctx.event.sender_id)
+    user_id = event.get_sender_id()
     if difficulty is None:
         difficulty = "mas"
+
+    if difficulty != "exp" and difficulty != "mas" and difficulty != "ult":
+        yield event.plain_result("ChunithmUtil:只接受\"exp\",\"mas\",\"uly\"作为难度")
+        return
+    
     cids = searchSong(name)
     
     songs = []
     with open(SONGS_PATH, 'r', encoding='utf-8-sig') as f:
         songs = json.load(f)
     if len(cids) == 0:
-        await ctx.reply(MessageChain([Plain("没有找到该歌曲，试着输入歌曲全称或其他别名")]))
+        yield event.plain_result("没有找到该歌曲，试着输入歌曲全称或其他别名")
         return
     elif len(cids) > 1:
-        msg_chain = MessageChain([Plain(f"有多个曲目符合条件\n")])
+        msg_chain = [Comp.Plain(f"有多个曲目符合条件\n")]
         for cid in cids:
-            name = None
+            name = None # type: ignore
             for song in songs:
                 if song.get('idx') == cid:
                     name = song.get('title')
                     break
-            msg_chain.append(Plain(f"c{cid} - {name}\n"))
-        msg_chain.append(Plain(f"\n请使用cid进行精准查询"))
-        await ctx.reply(msg_chain)
+            msg_chain.append(Comp.Plain(f"c{cid} - {name}\n"))
+        msg_chain.append(Comp.Plain(f"\n请使用cid进行精准查询"))
+        yield event.chain_result(msg_chain) # type: ignore
         return
     
     cid = cids[0]
     target_songs = []
     songutil = SongUtil()
-    difficulty = songutil.getDiff2Index(difficulty)
+    difficulty = songutil.getDiff2Index(difficulty) # type: ignore
     for song in songs:
         if song.get('idx') == cid:
             target_songs.append(song)
     try:
         if difficulty == 4 and len(target_songs) < 5: # 检查是否有Ultima难度
-            await ctx.reply(MessageChain([Plain(f"歌曲{song.get('title')}无Ultima难度")]))
+            yield event.plain_result(f"歌曲{song.get('title')}无Ultima难度")
             return
     except Exception as e:
-        await ctx.reply(MessageChain([Plain(f"未知难度： {e}")]))
+        yield event.plain_result(f"未知难度： {e}")
         return
     # 切换为对应难度
-    song = target_songs[difficulty]
+    song = target_songs[difficulty] # type: ignore
 
-    _, msg = updateScore(user_id, cid, score, difficulty, song.get('title'))
-    msg_chain = MessageChain([Plain(f"{msg}")])
-    await ctx.reply(msg_chain)
+    _, msg = updateScore(user_id, cid, score, difficulty, song.get('title')) # type: ignore
+    msg_chain = [Comp.Plain(f"{msg}")]
+    yield event.chain_result(msg_chain) # type: ignore
     

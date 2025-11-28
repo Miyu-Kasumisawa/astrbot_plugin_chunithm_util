@@ -1,27 +1,26 @@
 import os
 import json
-import dotenv
 
-from pkg.plugin.context import EventContext
-from pkg.plugin.events import *  # 导入事件类
-from pkg.platform.types import *
+from astrbot.api.event import filter, AstrMessageEvent, MessageEventResult
+from astrbot.api.star import Context, Star, register
+from astrbot.api import logger, AstrBotConfig
+import astrbot.api.message_components as Comp
 
+from ..main import Config
 from .utils.apicaller import *
 
-dotenv.load_dotenv()
-SONGS_PATH = os.path.join(os.path.dirname(__file__), "..", os.getenv("SONG_PATH"))
+SONGS_PATH = os.path.join(Config.DATA_PATH, Config.SONG_PATH)
 
-async def queryLevel(ctx: EventContext, args: list) -> None:
+async def queryLevel(event: AstrMessageEvent, level: str):
     '''查询指定定数的歌曲
     
     Args:
-        ctx (EventContext): 事件上下文
-        args (list): 参数列表
+        event (AstrMessageEvent): 事件上下文
+        level (str): 难度
     Returns:
         None: 无返回值
     '''
-    level, = args
-    
+
     songs = []
     matched_songs = []
     
@@ -63,7 +62,7 @@ async def queryLevel(ctx: EventContext, args: list) -> None:
         msgs = msgs + f"c{matched_song.get('id')} - {matched_song.get('title')} - {matched_song.get('internalLevelValue')}\n"
     
     message_data = {
-        "group_id": str(ctx.event.launcher_id),
+        "group_id": event.get_group_id,
         "user_id": "",
         "messages": [
             {

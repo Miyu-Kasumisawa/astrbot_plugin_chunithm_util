@@ -1,27 +1,27 @@
 import os
 import json
-import dotenv
 
-from pkg.plugin.context import EventContext
-from pkg.plugin.events import *  # 导入事件类
-from pkg.platform.types import *
+from astrbot.api.event import filter, AstrMessageEvent, MessageEventResult
+from astrbot.api.star import Context, Star, register
+from astrbot.api import logger, AstrBotConfig
+import astrbot.api.message_components as Comp
 
+from ..main import Config
 from .query_song import searchSong
 from .utils.songutil import SongUtil
 
-dotenv.load_dotenv()
-SONGS_PATH = os.path.join(os.path.dirname(__file__), "..", os.getenv("SONG_PATH"))
+SONGS_PATH = os.path.join(Config.DATA_PATH, Config.SONG_PATH)
 
-async def queryTolerance(ctx: EventContext, args: list) -> None:
+async def queryTolerance(event: AstrMessageEvent, name: str, difficulty: str):
     '''计算指定歌曲难度容错
     
     Args:
-        ctx (EventContext): 事件上下文
-        msg (str): 指令内容
+        event (AstrMessageEvent): 事件上下文
+        name (str): 歌曲名/歌曲cid
+        difficulty (str): 歌曲难度
     Returns:
         None: 无返回值
     '''
-    name, difficulty = args
     
     songs = []
     song = None
@@ -30,6 +30,10 @@ async def queryTolerance(ctx: EventContext, args: list) -> None:
     
     if difficulty == None:  # 默认mas
         difficulty = "mas"
+    
+    if difficulty != "exp" and difficulty != "mas" and difficulty != "ult":
+        yield event.plain_result("ChunithmUtil:只接受\"exp\",\"mas\",\"uly\"作为难度")
+        return
 
     matched_songs = searchSong(name)
     target_songs = []
@@ -39,36 +43,36 @@ async def queryTolerance(ctx: EventContext, args: list) -> None:
         song = target_songs[0]
         cid = song.get('idx')
     elif len(matched_songs) == 0:
-        await ctx.reply(MessageChain([Plain(f"没有找到{name}，请尝试输入歌曲全称或其他别名")]))
+        yield event.plain_result(f"没有找到{name}，请尝试输入歌曲全称或其他别名")
         return
     else:
-        msg_chain = MessageChain([Plain(f"有多个曲目符合条件\n")])
+        msg_chain = [Comp.Plain(f"有多个曲目符合条件\n")]
         for cid in matched_songs:
-            name = None
+            name = None # type: ignore
             for song in songs:
                 if song.get('idx') == cid:
                     name = song.get('title')
                     break
-            msg_chain.append(Plain(f"c{cid} - {name}\n"))
-        msg_chain.append(Plain(f"\n请使用cid进行精准查询"))
-        await ctx.reply(msg_chain)
+            msg_chain.append(Comp.Plain(f"c{cid} - {name}\n"))
+        msg_chain.append(Comp.Plain(f"\n请使用cid进行精准查询"))
+        yield event.chain_result(msg_chain) # type: ignore
         return
 
     songutil = SongUtil()
     index = songutil.getDiff2Index(difficulty)
     try:
         if index == 4 and len(song['sheets']) < 5: # 检查是否有Ultima难度
-            await ctx.reply(MessageChain([Plain(f"歌曲{song.get('title')}无Ultima难度")]))
+            yield event.plain_result(f"歌曲{song.get('title')}无Ultima难度")
             return
     except Exception as e:
-        await ctx.reply(MessageChain([Plain(f"未知难度")]))
+        yield event.plain_result(f"未知难度")
         return
     # 切换为对应难度
     song = target_songs[index]
     
     tolerance = songutil.calcTolerance(song, difficulty)
-    await ctx.reply(MessageChain([
-        Plain(f'c{cid} - {song.get("title")}\n难度 - {difficulty}\n'),
-        Plain(f'· 鸟容错\n{tolerance["1007500"]["attack"]}个attack + {tolerance["1007500"]["justice"]}个小j\n'),
-        Plain(f'· 鸟加容错\n{tolerance["1009000"]["attack"]}个attack + {tolerance["1009000"]["justice"]}个小j')
-    ]))
+    yield event.chain_result([
+        Comp.Plain(f'c{cid} - {song.get("title")}\n难度 - {difficulty}\n'),
+        Comp.Plain(f'· 鸟容错\n{tolerance["1007500"]["attack"]}个attack + {tolerance["1007500"]["justice"]}个小j\n'),
+        Comp.Plain(f'· 鸟加容错\n{tolerance["1009000"]["attack"]}个attack + {tolerance["1009000"]["justice"]}个小j')
+    ])

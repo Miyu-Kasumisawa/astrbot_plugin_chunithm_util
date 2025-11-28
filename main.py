@@ -1,10 +1,10 @@
 import re
 import os
-import dotenv
-
-from pkg.plugin.context import register, handler, BasePlugin, APIHost, EventContext
-from pkg.plugin.events import *  # 导入事件类
-from pkg.platform.types import *
+import shutil
+from astrbot.api.event import filter, AstrMessageEvent, MessageEventResult
+from astrbot.api.star import Context, Star, register
+from astrbot.api import logger, AstrBotConfig
+import astrbot.api.message_components as Comp
 
 from .src.query_help import *
 from .src.query_song import *
@@ -18,7 +18,8 @@ from .src.query_level import *
 from .src.query_update import *
 from .src.query_guess import *
 from .src.query_method import *
-from .src.query_chart_we import *
+# from .src.query_chart_we import * 疑似旧版本残留，替换为未使用但数据结构匹配的另一文件
+from .src.query_wechart import *
 from .src.query_updscore import *
 from .src.query_querybest import *
 from .src.query_copy import *
@@ -34,11 +35,67 @@ os.environ.pop("HTTPS_PROXY", None)
 os.environ.pop("all_proxy", None)
 os.environ.pop("ALL_PROXY", None)
 
+#配置类
+class Config:
+    # 类属性，默认配置
+    SONG_PATH = "./data/songs.json"
+    ALIAS_PATH = "./data/alias.json"
+    COVER_URL = "https://reiwa.f5.si/jackets/chunithm/"
+    ID2NAME_PATH = "./data/chartId2Name.json"
+    ID2GEN_PATH = "./data/chartId2Gen.json"
+    ID2DIFF_WE_PATH = "./data/chartId2Diff_we.json"
+    SEGA_SONG_PATH = "./data/data_new.json"
+    SEGA_COVER_URL = "https://new.chunithm-net.com/chuni-mobile/html/mobile/img/"
+    CHART_URL = "https://sdvx.in/chunithm/<gen>/obj/data<chartid>mst.png"
+    CHART_BG_URL = "https://sdvx.in/chunithm/<gen>/bg/<chartid>bg.png"
+    CHART_BAR_URL = "https://sdvx.in/chunithm/<gen>/bg/<chartid>bar.png"
+    BOT_QQ = "2537971097"
+
+    #插件数据路径
+    DATA_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__),"../plugin_data/astrbot_plugin_chunithm_util/"))
+
+    @classmethod
+    def update_from_dict(cls, config_dict):
+        """从字典更新类属性"""
+        for key, value in config_dict.items():
+            if hasattr(cls, key):
+                setattr(cls, key, str(value))
+
+    @classmethod
+    def get(cls, key, default=None):
+        """获取类属性，如果不存在返回默认值"""
+        return getattr(cls, key, default)
+
+    @classmethod
+    def set(cls, key, value):
+        """设置类属性"""
+        setattr(cls, key, str(value))
+
+    @classmethod
+    def to_dict(cls):
+        """将类属性转换为字典"""
+        # 获取所有不以双下划线开头的类属性
+        return {key: getattr(cls, key) for key in dir(cls) 
+                if not key.startswith('_') and not callable(getattr(cls, key)) and key.isupper()}
+
+    @classmethod
+    def __str__(cls):
+        """字符串表示，便于调试"""
+        return str(cls.to_dict())
+
 # 注册插件
-@register(name="ChunithmUtil", description="集成多项Chunithm实用功能的LangBot插件🧩", version="1.1", author="Amethyst")
-class ChunithmUtilPlugin(BasePlugin):
+@register("ChunithmUtil", "Amethyst", "集成多项Chunithm实用功能的AstrBot插件🧩", "1.1")
+class ChunithmUtilPlugin(Star):
     # 插件加载时触发
-    def __init__(self, host: APIHost):
+    def __init__(self, context: Context):
+        #初始化配置
+        Config.update_from_dict(self.context.get_config().values())
+        #检查内置别名列表是否复制到数据路径&检查数据目录是否存在
+        if not os.path.exists(os.path.join(Config.DATA_PATH,Config.ALIAS_PATH)):
+            if not os.path.exists(os.path.join(Config.DATA_PATH,"data")):
+                os.makedirs(os.path.join(Config.DATA_PATH,"data"))
+            shutil.copy2(os.path.join(os.path.dirname(__file__),'data','alias.json'),os.path.join(Config.DATA_PATH,Config.ALIAS_PATH))
+        """
         self.instructions = {
             "chu help": 
                 r"^chu\s?help$",
@@ -59,7 +116,7 @@ class ChunithmUtilPlugin(BasePlugin):
             "chuchart [歌曲id/别名] [难度]": 
                 r"^chuchart\s?(c\d+|.+?)(?: (exp|mas|ult))?$",
             "wechart [歌曲id/别名] [难度]":
-                r"^wecart\s?(c\d+|.+?)(.*)$",
+                r"^wechart\s?(c\d+|.+?)(.*)$",
             # ===== 查人 =====
             "chu曲师 [曲师名]" : 
                 r"^chu(?:曲师|\s?qs)\s?(.+)$",
@@ -95,8 +152,9 @@ class ChunithmUtilPlugin(BasePlugin):
             "[歌名]的[mid]这么打":
                 r"^(.+)的(\S+)这么打$",
         }
+        """
         self.guessgame = GuessGame()
-    
+    """
     def matchPattern(self, msg) -> str:
         '''匹配指令
         
@@ -110,11 +168,131 @@ class ChunithmUtilPlugin(BasePlugin):
             if re.match(self.instructions[pattern], msg):
                 res = pattern
         return res
-
+    """
     # 异步初始化
     async def initialize(self):
         pass
+    
+    #chu指令组
+    @filter.command_group('chu')
+    def chu(self):
+        pass
+
+    #帮助
+    @chu.command("help")
+    async def chuhelp(self, event:AstrMessageEvent):
+        queryHelp(event)
+
+    #根据定数筛选
+    @chu.command("lv")
+    async def chulv(self, event:AstrMessageEvent, level:str):
+        await queryLevel(event, level)
+
+    #更新数据
+    @chu.command("update")
+    async def chuupdate(self, event:AstrMessageEvent):
+        queryUpdate(event)
+
+    #猜歌管理
+    @chu.command("guess")
+    async def chuguess(self, event:AstrMessageEvent, arg:str):
+        if arg == "bas" or arg == "adv" or arg == "exp" or arg == "mas" or arg == "ult":
+            queryGuess(event, arg, "diff", self.guessgame)
+        elif arg == "end":
+            queryGuess(event, arg, "end", self.guessgame)
+
+    #猜歌提示
+    @chu.command("hint")
+    async def chuhint(self, event:AstrMessageEvent):
+        queryGuess(event, "", "hint", self.guessgame)
+
+    #迁移游玩数据
+    @chu.command("copy")
+    async def chucopy(self, event:AstrMessageEvent, server:str):
+        queryCopy(event,server)
+
+    #迁移游玩数据
+    @chu.command("bind")
+    async def chubind(self, event:AstrMessageEvent, server:str, token:str):
+        queryBind(event,server,token)
+
+
+    #猜歌
+    @filter.command("guess")
+    async def guess(self, event:AstrMessageEvent, arg:str):
+        queryGuess(event, arg, "name", self.guessgame)
+
+    
+    #模糊搜索音乐自定义筛选函数
+    def MusicSearchFilterFunc(self, event:AstrMessageEvent, cfg: AstrBotConfig) -> bool:
+        if (re.match(r"^(.+)是什么歌$",event.message_str)):
+            return True
+        else:
+            return False
+
+    #模糊搜索音乐
+    @filter.custom_filter(MusicSearchFilterFunc)
+    async def MusicSearch(self, event:AstrMessageEvent):
+        match = re.search(r"^(.+)是什么歌$", event.message_str)
+        if (match == None):
+            yield event.plain_result("ChunithmUtil:查询条件不能为空")
+        else:
+            querySong(event, match.group(1))
+
+    #随机音乐
+    @filter.command("chu随机一曲",alias={"chu随机"})
+    async def RandomMusic(self, event:AstrMessageEvent):
+        queryRdnSong(event)
         
+    #添加别名
+    @filter.event_message_type(filter.EventMessageType.GROUP_MESSAGE)
+    @filter.command("chuset",alias={"添加别名"})
+    async def AddAlias(self, event:AstrMessageEvent, cid:str, alias:str):
+        queryAddAlias(event, cid, alias)
+
+    #查询别名
+    @filter.command("alias",alias={"别名"})
+    async def GetAlias(self, event:AstrMessageEvent, condition:str):
+        queryGetAlias(event, condition)
+
+    #查询容错
+    @filter.command("churc",alias={"chu容错"})
+    async def Tolerance(self, event:AstrMessageEvent, name:str, difficulty:str):
+        queryTolerance(event, name, difficulty)
+
+    #查询谱面
+    @filter.event_message_type(filter.EventMessageType.GROUP_MESSAGE)
+    @filter.command("chuchart")
+    async def ChuChart(self, event:AstrMessageEvent, name:str, difficulty:str):
+        queryChart(event, name, difficulty)
+
+    #查询WE谱面
+    @filter.event_message_type(filter.EventMessageType.GROUP_MESSAGE)
+    @filter.command("wechart")
+    async def WeChart(self, event:AstrMessageEvent, name:str, type:str):
+        queryChartWE(event, name, type)
+
+    #查询曲师
+    @filter.command("chuqs",alias={"chu曲师"})
+    async def ChuArtist(self, event:AstrMessageEvent, artist:str):
+        queryArtist(event, artist)
+
+    #更新分数
+    @filter.command("update")
+    async def UpdateScore(self, event:AstrMessageEvent, score: int, name: str, difficulty: str):
+        queryUpdScore(event, score, name, difficulty)
+
+    #b30
+    @filter.command("b30")
+    async def b30(self, event:AstrMessageEvent, arg:str):
+        queryQueryBest(event, arg, "30")
+
+    #b50
+    @filter.command("b50")
+    async def b50(self, event:AstrMessageEvent, arg:str):
+        queryQueryBest(event, arg, "50")
+
+    """
     @handler(GroupMessageReceived)
     async def msg_received(self, ctx: EventContext):
         msg = str(ctx.event.message_chain).strip()
@@ -177,6 +355,7 @@ class ChunithmUtilPlugin(BasePlugin):
             
             case _:
                 pass
+        """
                         
     # 插件卸载时触发
     def __del__(self):

@@ -1,0 +1,62 @@
+{
+  "SONG_PATH": {
+    "description": "音乐列表路径",
+    "type": "string",
+    "default": "./data/songs.json"
+  },
+  "ALIAS_PATH": {
+    "description": "别名列表路径",
+    "type": "string",
+    "default": "./data/alias.json"
+  },
+  "COVER_URL": {
+    "description": "音乐封面获取链接",
+    "type": "string",
+    "default": "https://reiwa.f5.si/jackets/chunithm/"
+  },
+  "ID2NAME_PATH": {
+    "description": "id-歌曲名映射表路径",
+    "type": "string",
+    "default": "./data/chartId2Name.json"
+  },
+  "ID2GEN_PATH": {
+    "description": "id-版本号映射表路径",
+    "type": "string",
+    "default": "./data/chartId2Gen.json"
+  },
+  "ID2DIFF_WE_PATH": {
+    "description": "id-链接前缀映射表路径",
+    "type": "string",
+    "default": "./data/chartId2Diff_we.json"
+  },
+  "SEGA_SONG_PATH": {
+    "description": "sega新曲列表路径",
+    "type": "string",
+    "default": "./data/data_new.json"
+  },
+  "SEGA_COVER_URL": {
+    "description": "sega新曲封面获取链接",
+    "type": "string",
+    "default": "https://new.chunithm-net.com/chuni-mobile/html/mobile/img/"
+  },
+  "CHART_URL": {
+    "description": "谱面基本信息获取链接",
+    "type": "string",
+    "default": "https://sdvx.in/chunithm/<gen>/obj/data<chartid>mst.png"
+  },
+  "CHART_BG_URL": {
+    "description": "谱面背景图获取链接",
+    "type": "string",
+    "default": "https://sdvx.in/chunithm/<gen>/bg/<chartid>bg.png"
+  },
+  "CHART_BAR_URL": {
+    "description": "谱面小节数获取链接",
+    "type": "string",
+    "default": "https://sdvx.in/chunithm/<gen>/bg/<chartid>bar.png"
+  },
+  "BOT_QQ": {
+    "description": "机器人QQ号，用于合并转发消息构建",
+    "type": "string",
+    "default": "2537971097"
+  }
+}

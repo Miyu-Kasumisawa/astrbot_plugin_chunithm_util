@@ -1,23 +1,23 @@
 import os
 import os.path as osp
 import json
-import random
-import dotenv
+from pathlib import Path
 import sqlite3
 import numpy as np
 from jinja2 import Template
 import base64
 
-from pkg.plugin.context import EventContext
-from pkg.plugin.events import *  # 导入事件类
-from pkg.platform.types import *
+from astrbot.api.event import filter, AstrMessageEvent, MessageEventResult
+from astrbot.api.star import Context, Star, register
+from astrbot.api import logger, AstrBotConfig
+import astrbot.api.message_components as Comp
 
+from ..main import Config
 from .query_song import searchSong
 from .utils.songutil import *
 from .utils.apicaller import *
 
-dotenv.load_dotenv()
-SONGS_PATH = os.path.join(os.path.dirname(__file__), "..", os.getenv("SONG_PATH"))
+SONGS_PATH = os.path.join(Config.DATA_PATH, Config.SONG_PATH)
 COVER_CACHE_DIR = os.path.join(os.path.dirname(__file__), '..', 'cache', 'covers')
 DB_PATH = os.path.join(os.path.dirname(__file__), "..", 'data', 'data.db')
 TEMPLATE_PATH = os.path.join(os.path.dirname(__file__), "..", 'template', 'best.html')
@@ -58,7 +58,7 @@ def convertRank(rank: str):
 def format_with_commas(number: int):
     return f"{number:,}"
 
-def getSongInfo(cids: np.ndarray, difficulty: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+def getSongInfo(cids: np.ndarray, difficulty: np.ndarray) -> tuple[np.ndarray, np.ndarray, list]:
     '''获取歌曲信息
     
     Returns:
@@ -193,7 +193,7 @@ def renderCardHTML(records: list[tuple]):
                 background_color = "#8C00FF"
         # 处理cover
         songutil = SongUtil()
-        songutil.checkIsHit(os.getenv('COVER_URL'), record[-1])
+        songutil.checkIsHit(Config.COVER_URL, record[-1])
         card_html = f"""
         <div class="card">
             <div class="song_cover">
@@ -287,7 +287,7 @@ async def convertHTMLtoIMG(html: str, output_path: str, width=2230, height=720, 
         await page.screenshot(path=output_path, full_page=True)
         await browser.close()
 
-async def queryBest30(ctx: EventContext, user_id: str, use_simple=False):
+async def queryBest30(event: AstrMessageEvent, user_id: str, use_simple=False):
     '''查询b30'''
     try:
         conn = sqlite3.connect(DB_PATH)
@@ -295,7 +295,7 @@ async def queryBest30(ctx: EventContext, user_id: str, use_simple=False):
         c.execute(f"SELECT * FROM record WHERE user_id='{user_id}'")
         records = c.fetchall()
         if len(records) == 0:
-            await ctx.reply(MessageChain([Plain(f"你还没有记录哦")]))
+            yield event.plain_result(f"你还没有记录哦")
         records = np.array([list(record) for record in records])
         cids = np.copy(records[:, 1])
         difficulty = np.copy(records[:, 3]).astype(int)
@@ -324,10 +324,10 @@ async def queryBest30(ctx: EventContext, user_id: str, use_simple=False):
             average_rating = np.sum(sorted_records[:, -1].astype(float)) / 30.0
         except Exception as e:
             average_rating = 0.0
-            await ctx.reply(MessageChain([Plain(f"计算错误，{e}")]))
+            yield event.plain_result(f"计算错误，{e}")
         average_rating = round(average_rating, 3)
         # 仅返回文本
-        if use_simple:
+        if use_simple == "simple":
             # [cid, score, difficulty, name, const, rating] -> [cid, name, difficulty, score, rating]
             cols = [0, 3, 2, 1, 5]  # cid, name, difficulty, score, rating
             result = sorted_records[:, cols]
@@ -350,7 +350,7 @@ async def queryBest30(ctx: EventContext, user_id: str, use_simple=False):
                 }
                 msgs.append(unit)
             message_data = {
-                "group_id": str(ctx.event.launcher_id),
+                "group_id": event.get_group_id(),
                 "user_id": "",
                 "messages": msgs,
                 "news": [
@@ -377,22 +377,22 @@ async def queryBest30(ctx: EventContext, user_id: str, use_simple=False):
                 # [cid, score, difficulty, name, const, rating] -> [cid, score, difficulty, name, const, rating, cover]
                 sorted_records = np.concatenate((sorted_records, np.array(cover).reshape(-1, 1)), axis=1)
             except Exception as e:
-                await ctx.reply(MessageChain([Plain(f"拼接失败，{e}")]))
+                yield event.plain_result(f"拼接失败，{e}")
             try:
                 card_html = renderCardHTML(sorted_records.tolist())
                 html = renderBestHTML(card_html, average_rating)
                 img_path = osp.join(BEST_HTML_DIR, f"best_{user_id}.png")
                 await convertHTMLtoIMG(html, img_path)
-                img_component = await Image.from_local(img_path)
-                await ctx.reply(MessageChain([img_component]))
+                img_component = Comp.Image(img_path)
+                yield event.chain_result([img_component])
             except Exception as e:
                 # await ctx.reply(MessageChain([Plain(f"traceback: {traceback.format_exc()}")]))
-                await ctx.reply(MessageChain([Plain(f"生成Best30图表失败，{e}")]))
+                yield event.chain_result([Comp.Plain(f"生成Best30图表失败，{e}")])
     except sqlite3.Error as e:
         print(e)
         return -1, f"查询失败，{e}"
 
-async def queryQueryBest(ctx: EventContext, args: list, **kwargs) -> None:
+async def queryQueryBest(event: AstrMessageEvent, arg: str, pattern: str):
     '''查询最佳
     
     Args:
@@ -401,19 +401,18 @@ async def queryQueryBest(ctx: EventContext, args: list, **kwargs) -> None:
     Returns:
         None: 无返回值
     '''
-    use_simple, = args
+    use_simple = arg
     use_simple = True if use_simple else False
-    user_id = str(ctx.event.sender_id)
-    pattern = kwargs .get('pattern', None)
+    user_id = event.get_sender_id()
     
     match pattern:
-        case 'b30':
-            await ctx.reply(MessageChain([Plain(f"正在查询Best30...")]))
-            await queryBest30(ctx, user_id, use_simple=use_simple)
-        case 'b50':
-            await ctx.reply(MessageChain([Plain(f"前面的区域以后再探索吧！")]))
+        case '30':
+            yield event.plain_result(f"正在查询Best30...")
+            await queryBest30(event, user_id, use_simple=use_simple)
+        case '50':
+            yield event.plain_result(f"前面的区域以后再探索吧！")
         case _:
-            await ctx.reply(MessageChain([Plain(f"未知指令：{pattern}")]))
+            yield event.plain_result(f"未知指令：{pattern}")
     
     
     

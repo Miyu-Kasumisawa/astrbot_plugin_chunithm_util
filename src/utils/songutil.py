@@ -52,7 +52,7 @@ class SongUtil:
                 return keys
         return None
     
-    def getArtists(self, songs: list) -> str:
+    def getArtists(self, songs: list) -> list: #返回类型疑似有误，由str修改为list
         '''获取所有曲师构成的列表
         
         Args:

@@ -1,3 +1,5 @@
+#弃用功能
+"""
 import asyncio
 import os
 import json
@@ -261,3 +263,4 @@ async def queryMethod(ctx: EventContext, args: list, pattern: str, msg: str) -> 
             save_path = img_info['save_path']
             await ctx.reply(MessageChain([Plain(f"手法已上传！使用“[歌名]有什么手法”查看已有解析")]))
             return
+"""

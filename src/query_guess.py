@@ -1,25 +1,23 @@
-import asyncio
 import os
 import json
-import dotenv
 import random
-import PIL
+from PIL import Image
 
-from pkg.core.entities import LauncherTypes
-from pkg.plugin.context import EventContext
-from pkg.plugin.events import *  # 导入事件类
-from pkg.platform.types import *
+from astrbot.api.event import filter, AstrMessageEvent, MessageEventResult
+from astrbot.api.star import Context, Star, register
+from astrbot.api import logger, AstrBotConfig
+import astrbot.api.message_components as Comp
 
+from ..main import Config
 from .query_song import searchSong
 from .utils.songutil import SongUtil
 from .utils.guessgame import GuessGame
 
-dotenv.load_dotenv()
-SONGS_PATH = os.path.join(os.path.dirname(__file__), "..", os.getenv("SONG_PATH"))
+SONGS_PATH = os.path.join(Config.DATA_PATH, Config.SONG_PATH)
 GAME_CACHE_PATH = os.path.join(os.path.dirname(__file__), "..", 'cache', 'others')
 COVER_CACHE_DIR = os.path.join(os.path.dirname(__file__), '..', 'cache', 'covers')
 
-async def queryGuess(ctx: EventContext, args: list, pattern: str, guessgame: GuessGame) -> None:
+async def queryGuess(event: AstrMessageEvent, arg: str, pattern: str, guessgame: GuessGame):
     '''处理猜歌事件
     
     Args:
@@ -30,12 +28,10 @@ async def queryGuess(ctx: EventContext, args: list, pattern: str, guessgame: Gue
     '''
     songs = []
     match pattern:
-        case "chu guess [难度]":
+        case "diff":
             '''创建猜歌曲目'''
-            difficulty, = args
-            group_id = str(ctx.event.launcher_id)
-            if ctx.event.query.launcher_type == LauncherTypes.PERSON:
-                return
+            difficulty = arg
+            group_id = event.get_group_id()
             if not guessgame.check_is_exist(group_id):
                 guessgame.add_group(group_id)
                 '''为该群创建一个新的猜歌游戏'''
@@ -50,7 +46,7 @@ async def queryGuess(ctx: EventContext, args: list, pattern: str, guessgame: Gue
                 guessgame.set_song_index(group_id, cid)
                 
                 songutil = SongUtil()
-                songutil.checkIsHit(os.getenv('COVER_URL'), song.get('img'))
+                songutil.checkIsHit(Config.COVER_URL, song.get('img'))
                 
                 # 随机剪裁曲绘
                 difficulty = difficulty if difficulty else "mas"
@@ -69,7 +65,7 @@ async def queryGuess(ctx: EventContext, args: list, pattern: str, guessgame: Gue
                     case _:
                         factor = 2.5
                 img_path = os.path.join(COVER_CACHE_DIR, song.get('img') + ".webp")
-                img = PIL.Image.open(img_path)
+                img = Image.open(img_path)
                 img_w, img_h = img.size
                 new_w = img_w / factor
                 new_h = img_h / factor
@@ -79,59 +75,59 @@ async def queryGuess(ctx: EventContext, args: list, pattern: str, guessgame: Gue
                 new_img.save(os.path.join(GAME_CACHE_PATH, f"{group_id}.png"))
                 
                 # 加载剪裁后的曲绘
-                img_component = await Image.from_local(os.path.join(GAME_CACHE_PATH, f"{group_id}.png"))
-                msg_chain = MessageChain([
-                    Plain(f"Chunithm Guess\n裁剪难度：{difficulty}\n可以使用“guess [歌名/别名]”进行猜歌"),
+                img_component = Comp.Image(os.path.join(GAME_CACHE_PATH, f"{group_id}.png"))
+                msg_chain = [
+                    Comp.Plain(f"Chunithm Guess\n裁剪难度：{difficulty}\n可以使用“guess [歌名/别名]”进行猜歌"),
                     img_component
-                ])
-                await ctx.reply(msg_chain)
+                ]
+                yield event.chain_result(msg_chain)
                 
             else:
                 '''该群已经有猜歌游戏'''
-                await ctx.reply(MessageChain([
-                    At(ctx.event.sender_id),
-                    Plain("\n该群已经有正在进行的猜歌，请不要重复创建")
-                ]))
+                yield event.chain_result([
+                    Comp.At(qq=event.get_sender_id()),
+                    Comp.Plain("\n该群已经有正在进行的猜歌，请不要重复创建")
+                ])
                 return
-        case "chu guess end":
-            if not guessgame.check_is_exist(str(ctx.event.launcher_id)):
-                await ctx.reply(MessageChain([
-                    At(ctx.event.sender_id),
-                    Plain("\n该群还没有创建猜歌，可以使用“chu guess [难度]”进行创建")
-                ]))
+        case "end":
+            if not guessgame.check_is_exist(event.get_group_id()):
+                yield event.chain_result([
+                    Comp.At(qq=event.get_sender_id()),
+                    Comp.Plain("\n该群还没有创建猜歌，可以使用“chu guess [难度]”进行创建")
+                ])
                 return
             songs = None
             song = None
             with open(SONGS_PATH, "r", encoding="utf-8-sig") as file:
                 songs = json.load(file)
-            true_index = guessgame.get_group_index(str(ctx.event.launcher_id))
+            true_index = guessgame.get_group_index(event.get_group_id())
             for s in songs:
                 if s.get('idx') == true_index:
                     song = s
                     break
             songutil = SongUtil()
-            songutil.checkIsHit(os.getenv('COVER_URL'), song.get('img'))
-            img_component = await Image.from_local(os.path.join(COVER_CACHE_DIR, song.get('img') + ".webp"))
-            await ctx.reply(MessageChain([
-                Plain(f"好像没人猜出来捏，正确答案为：\nc{true_index} - {song.get('title')}"),
+            songutil.checkIsHit(Config.COVER_URL, song.get('img'))
+            img_component = Comp.Image(os.path.join(COVER_CACHE_DIR, song.get('img') + ".webp"))
+            yield event.chain_result([
+                Comp.Plain(f"好像没人猜出来捏，正确答案为：\nc{true_index} - {song.get('title')}"),
                 img_component,
-                Plain(f"可以顺手使用“chuset c{true_index} [别名]”为该歌曲添加别名，方便以后的猜歌")
-            ]))
-            guessgame.remove_group(str(ctx.event.launcher_id))
-            await ctx.reply(MessageChain([Plain("已结束此次猜歌\n可使用“chu guess [难度]”创建新的猜歌")]))
+                Comp.Plain(f"可以顺手使用“chuset c{true_index} [别名]”为该歌曲添加别名，方便以后的猜歌")
+            ])
+            guessgame.remove_group(event.get_group_id())
+            yield event.plain_result("已结束此次猜歌\n可使用“chu guess [难度]”创建新的猜歌")
             return
-        case "guess [歌名]":
+        case "name":
             '''检查猜歌'''
-            name, = args
-            group_id = str(ctx.event.launcher_id)
+            name = arg
+            group_id = event.get_group_id()
             song = None
             cid = -1
             
             if not guessgame.check_is_exist(group_id):
-                await ctx.reply(MessageChain([
-                    At(ctx.event.sender_id),
-                    Plain("\n该群还没有创建猜歌，可以使用“chu guess [难度]”进行创建")
-                ]))
+                yield event.chain_result([
+                    Comp.At(qq=event.get_sender_id()),
+                    Comp.Plain("\n该群还没有创建猜歌，可以使用“chu guess [难度]”进行创建")
+                ])
                 return
                 
             with open(SONGS_PATH, "r", encoding="utf-8-sig") as file:
@@ -144,45 +140,45 @@ async def queryGuess(ctx: EventContext, args: list, pattern: str, guessgame: Gue
                 song = target_songs[0]
                 cid = song.get('idx')
             elif len(matched_songs) == 0:
-                await ctx.reply(MessageChain([Plain(f"没有找到{name}，请尝试输入歌曲全称或其他别名")]))
+                yield event.plain_result(f"没有找到{name}，请尝试输入歌曲全称或其他别名")
                 return
             else:
-                msg_chain = MessageChain([Plain(f"有多个曲目符合条件\n")])
+                msg_chain = [Comp.Plain(f"有多个曲目符合条件\n")]
                 for cid in matched_songs:
                     name = None
                     for song in songs:
                         if song.get('idx') == cid:
                             name = song.get('title')
                             break
-                    msg_chain.append(Plain(f"c{cid} - {name}\n"))
-                msg_chain.append(Plain(f"\n请使用cid进行精准查询"))
-                await ctx.reply(msg_chain)
+                    msg_chain.append(Comp.Plain(f"c{cid} - {name}\n"))
+                msg_chain.append(Comp.Plain(f"\n请使用cid进行精准查询"))
+                yield event.chain_result(msg_chain) # type: ignore
                 return
             
             '''检查index是否正确'''
             if guessgame.check_is_correct(group_id, cid):
                 songutil = SongUtil()
-                songutil.checkIsHit(os.getenv('COVER_URL'), song.get('img'))
-                img_component = await Image.from_local(os.path.join(COVER_CACHE_DIR, song.get('img') + ".webp"))
-                await ctx.reply(MessageChain([
-                    At(ctx.event.sender_id),
-                    Plain(f"\n恭喜捏，正确答案是：\nc{cid} - {song.get('title')}"),
+                songutil.checkIsHit(Config.COVER_URL, song.get('img'))
+                img_component = Comp.Image(os.path.join(COVER_CACHE_DIR, song.get('img') + ".webp"))
+                yield event.chain_result([
+                    Comp.At(qq=event.get_sender_id()),
+                    Comp.Plain(f"\n恭喜捏，正确答案是：\nc{cid} - {song.get('title')}"),
                     img_component
-                ]))
+                ])
                 # 移除群的猜歌游戏
                 guessgame.remove_group(group_id)
                 return
             else:
-                await ctx.reply(MessageChain([At(ctx.event.sender_id), Plain(f"\n不对捏，再试试吧")]))
+                yield event.chain_result([Comp.At(qq=event.get_sender_id()), Comp.Plain(f"\n不对捏，再试试吧")])
                 return
-        case "chu hint":
+        case "hint":
             '''获取提示'''
-            group_id = str(ctx.event.launcher_id)
+            group_id = event.get_group_id()
             if not guessgame.check_is_exist(group_id):
-                await ctx.reply(MessageChain([
-                    At(ctx.event.sender_id),
-                    Plain("\n该群还没有创建猜歌，可以使用“chu guess [难度]”进行创建")
-                ]))
+                yield event.chain_result([
+                    Comp.At(qq=event.get_sender_id()),
+                    Comp.Plain("\n该群还没有创建猜歌，可以使用“chu guess [难度]”进行创建")
+                ])
                 return
             cid = guessgame.get_group_index(group_id)
             song = None
@@ -205,8 +201,8 @@ async def queryGuess(ctx: EventContext, args: list, pattern: str, guessgame: Gue
             ]
             
             hint = random.choice(hints)
-            await ctx.reply(MessageChain([
-                Plain("提示🌟\n"),
-                Plain(hint)
-            ]))
+            yield event.chain_result([
+                Comp.Plain("提示🌟\n"),
+                Comp.Plain(hint)
+            ])
             return

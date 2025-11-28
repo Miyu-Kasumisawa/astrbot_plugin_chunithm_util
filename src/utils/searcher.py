@@ -1,5 +1,4 @@
 import difflib
-import json
 import re
 
 class Searcher:

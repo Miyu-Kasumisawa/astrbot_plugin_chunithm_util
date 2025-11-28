@@ -1,24 +1,23 @@
 import os
 import json
 import random
-import dotenv
 
-from pkg.plugin.context import EventContext
-from pkg.plugin.events import *  # 导入事件类
-from pkg.platform.types import *
+from astrbot.api.event import filter, AstrMessageEvent, MessageEventResult
+from astrbot.api.star import Context, Star, register
+from astrbot.api import logger, AstrBotConfig
+import astrbot.api.message_components as Comp
 
+from ..main import Config
 from .utils.songutil import SongUtil
 
-dotenv.load_dotenv()
-SONGS_PATH = os.path.join(os.path.dirname(__file__), "..", os.getenv("SONG_PATH"))
+SONGS_PATH = os.path.join(Config.DATA_PATH, Config.SONG_PATH)
 COVER_CACHE_DIR = os.path.join(os.path.dirname(__file__), '..', 'cache', 'covers')
 
-async def queryRdnSong(ctx: EventContext, args: list) -> None:
+async def queryRdnSong(event: AstrMessageEvent):
     '''随机一曲
     
     Args:
-        ctx (EventContext): 事件上下文
-        args (list): 参数列表
+        event (AstrMessageEvent): 事件上下文
     Returns:
         None: 无返回值
     '''
@@ -38,4 +37,4 @@ async def queryRdnSong(ctx: EventContext, args: list) -> None:
     # msg_chain.append(img_conponent)
     # await ctx.reply(msg_chain)
     
-    await ctx.reply(MessageChain([Plain("Not implemented yet.")]))
+    yield event.plain_result("Not implemented yet.")

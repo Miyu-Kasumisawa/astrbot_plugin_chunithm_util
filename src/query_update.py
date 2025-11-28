@@ -1,38 +1,36 @@
 import os
-import dotenv
 import subprocess
-import json
 
-from pkg.plugin.context import EventContext
-from pkg.plugin.events import *  # 导入事件类
-from pkg.platform.types import *
+from astrbot.api.event import filter, AstrMessageEvent, MessageEventResult
+from astrbot.api.star import Context, Star, register
+from astrbot.api import logger, AstrBotConfig
+import astrbot.api.message_components as Comp
 
+from ..main import Config
 from .utils import songmeta
 
-dotenv.load_dotenv()
 SCRIPT_SONGMETA_PATH = os.path.join(os.path.dirname(__file__), "utils", "songmeta.py")
 SCRIPT_MAPPING_PATH = os.path.join(os.path.dirname(__file__), "utils", "mapping.py")
 
-async def queryUpdate(ctx: EventContext, args: list) -> None:
-    _ = args
+async def queryUpdate(event: AstrMessageEvent):
     
     diff = None
     try:
-        await ctx.reply(MessageChain([Plain("正在更新...")]))
-        diff = songmeta.songMeta()
+        yield event.plain_result("正在更新...")
+        diff = songmeta.songMeta() #待修复
         subprocess.run(['python', SCRIPT_MAPPING_PATH])
-        msg_chain = MessageChain([
-            Plain("更新成功"),
-        ])
+        msg_chain =[
+            Comp.Plain("更新成功"),
+        ]
         
         if len(diff) > 20:
-            msg_chain.append(Plain(f"，新增曲目过多，仅展示前20首"))
+            msg_chain.append(Comp.Plain(f"，新增曲目过多，仅展示前20首"))
         if len(diff) != 0:
-            msg_chain.append(Plain(f"，新增曲目：\n"))
+            msg_chain.append(Comp.Plain(f"，新增曲目：\n"))
             for song in diff[::-1][ : min(20, len(diff))]:
-                msg_chain.append(Plain(f"· {song.get('songId')}\n"))
-        await ctx.reply(msg_chain)
+                msg_chain.append(Comp.Plain(f"· {song.get('songId')}\n"))
+        yield event.chain_result(msg_chain) # type: ignore
     
     except subprocess.CalledProcessError as e:
-        await ctx.reply(MessageChain([Plain(f"更新失败：{e}")]))
+        yield event.plain_result(f"更新失败：{e}")
         return

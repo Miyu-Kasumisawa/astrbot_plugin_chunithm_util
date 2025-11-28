@@ -1,4 +1,4 @@
-import requests, re, os, json
+import re, os, json
 from bs4 import BeautifulSoup
 
 url = "https://sdvx.in/chunithm/end.htm"

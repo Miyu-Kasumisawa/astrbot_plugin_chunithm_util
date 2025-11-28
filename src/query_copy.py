@@ -1,28 +1,27 @@
 import os
 import os.path as osp
 import json
-import dotenv
 import sqlite3
-import numpy as np
 
-from pkg.plugin.context import EventContext
-from pkg.plugin.events import *  # 导入事件类
-from pkg.platform.types import *
+from astrbot.api.event import filter, AstrMessageEvent, MessageEventResult
+from astrbot.api.star import Context, Star, register
+from astrbot.api import logger, AstrBotConfig
+import astrbot.api.message_components as Comp
 
+from ..main import Config
 from .query_song import searchSong
 from .utils.songutil import *
 
-dotenv.load_dotenv()
-SONGS_PATH = os.path.join(os.path.dirname(__file__), "..", os.getenv("SONG_PATH"))
+SONGS_PATH = os.path.join(Config.DATA_PATH, Config.SONG_PATH)
 DB_PATH = os.path.join(os.path.dirname(__file__), "..", 'data', 'data.db')
 LX_JSON_PATH = osp.join(osp.dirname(__file__), '..', 'data', 'lx.json')
 HELP_API_IMG_PATH = osp.join(osp.dirname(__file__), '..', 'images', 'api.png')
 
 # ========= 落雪查分器 =========
 class LXHandler:
-    def __init__(self, ctx: EventContext):
-        self.ctx = ctx
-        self.user_id = str(ctx.event.sender_id)
+    def __init__(self, event: AstrMessageEvent):
+        self.event = event
+        self.user_id = event.get_sender_id()
         self.song_url = "https://maimai.lxns.net/api/v0/chunithm/song/list"
         self.record_url = "https://maimai.lxns.net/api/v0/user/chunithm/player/scores"
     
@@ -38,7 +37,7 @@ class LXHandler:
                 json.dump({'users': users}, f, indent=4)
             return 0
         except Exception as e:
-            await self.ctx.reply([Plain(f'写入用户信息失败：{e}')])
+            yield self.event.plain_result(f'写入用户信息失败：{e}')
             return -1
     
     def checkIsBind(self, users: dict):
@@ -64,9 +63,9 @@ class LXHandler:
     async def copyLXRecord(self):
         users = await self.readUsersJson()
         if not self.checkIsBind(users):
-            img = await Image.from_local(HELP_API_IMG_PATH)
-            await self.ctx.reply([
-                Plain('你还没有绑定账号，请先使用“chubind [服务器] [TOKEN]”绑定账号\n（服务器暂时仅支持lx）\n\nTOKEN获取地址：https://maimai.lxns.net/user/profile'),
+            img = Comp.Image(HELP_API_IMG_PATH)
+            yield self.event.chain_result([
+                Comp.Plain('你还没有绑定账号，请先使用“chubind [服务器] [TOKEN]”绑定账号\n（服务器暂时仅支持lx）\n\nTOKEN获取地址：https://maimai.lxns.net/user/profile'),
                 img  
             ])
             return
@@ -83,25 +82,25 @@ class LXHandler:
                     records = data.get('data', [])
                     for record in records:
                         self.updateRecord(self.user_id, str(record.get('id')), record.get('score'), record.get('level_index'))
-                    await self.ctx.reply([Plain('迁移LX查分器数据成功')])
+                    yield self.event.plain_result('迁移LX查分器数据成功')
                     return
                 except Exception as e:
-                    await self.ctx.reply([Plain(f'迁移LX查分器数据失败，{e}')])
+                    yield self.event.plain_result(f'迁移LX查分器数据失败，{e}')
                     return
             case _:
-                await self.ctx.reply([Plain(f'获取失败，请检查TOKEN是否正确')])
+                yield self.event.plain_result(f'获取失败，请检查TOKEN是否正确')
                 return
         
 # ========= Rin服 =========
 class RinHandler:
-    def __init__(self, ctx: EventContext, user_id: str):
-        self.ctx = ctx
+    def __init__(self, event: AstrMessageEvent, user_id: str):
+        self.ctx = event
         self.user_id = user_id
         
     async def copyRinRecord(self, user_id: str):
         raise NotImplementedError
 
-async def queryCopy(ctx: EventContext, args: list, **kwargs) -> None:
+async def queryCopy(event: AstrMessageEvent, server: str):
     '''查询最佳
     
     Args:
@@ -110,14 +109,13 @@ async def queryCopy(ctx: EventContext, args: list, **kwargs) -> None:
     Returns:
         None: 无返回值
     '''
-    server, = args
     match server:
         case 'lx':
-            lx = LXHandler(ctx)
+            lx = LXHandler(event)
             await lx.copyLXRecord()
         case 'rin':
-            await ctx.reply(MessageChain([Plain(f"暂不支持{server}服务器")]))
+            yield event.plain_result(f"暂不支持{server}服务器")
             return
         case _:
-            await ctx.reply(MessageChain([Plain(f"未知服务器{server}")]))
+            yield event.plain_result(f"未知服务器{server}")
             return

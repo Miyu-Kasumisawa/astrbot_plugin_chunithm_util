@@ -1,7 +1,5 @@
 import os
-import aiohttp
-import PIL
-import dotenv
+from PIL import Image
 import traceback
 import base64
 import ssl
@@ -10,6 +8,7 @@ import aiofiles
 import asyncio
 import httpx
 
+from ...main import Config
 from .searcher import *
 from .apicaller import *
 from .songutil import *
@@ -18,7 +17,6 @@ CHART_CACHE_DIR = os.path.join(os.path.dirname(__file__), '..', '..', 'cache', '
 
 ssl_context = ssl.create_default_context(cafile=certifi.where())
 
-dotenv.load_dotenv()
 
 class ChartUtil:
     def __init__(self):
@@ -32,7 +30,7 @@ class ChartUtil:
         Returns:
             谱面ID
         '''
-        ID2NAME_PATH = os.path.join(os.path.dirname(__file__), '..', '..', os.getenv("ID2NAME_PATH"))
+        ID2NAME_PATH = os.path.join(Config.DATA_PATH, Config.ID2NAME_PATH)
         with open(ID2NAME_PATH, "r", encoding="utf-8") as f:
             f = json.load(f)
             searcher = Searcher()
@@ -50,7 +48,7 @@ class ChartUtil:
         Returns:
             谱面版本ID
         '''
-        ID2GEN_PATH = os.path.join(os.path.dirname(__file__), '..', '..', os.getenv("ID2GEN_PATH"))
+        ID2GEN_PATH = os.path.join(Config.DATA_PATH, Config.ID2GEN_PATH)
         with open(ID2GEN_PATH, "r", encoding="utf-8") as f:
             f = json.load(f)
             return f.get(chartID) 
@@ -65,9 +63,9 @@ class ChartUtil:
         Returns:
             [谱面URL, 背景URL, 小节数URL]
         '''
-        charturl = os.getenv("CHART_URL").replace("<chartid>", chartID)
-        bgurl = os.getenv("CHART_BG_URL").replace("<chartid>", chartID)
-        barurl = os.getenv("CHART_BAR_URL").replace("<chartid>", chartID)
+        charturl = Config.CHART_URL.replace("<chartid>", chartID)
+        bgurl = Config.CHART_BG_URL.replace("<chartid>", chartID)
+        barurl = Config.CHART_BAR_URL.replace("<chartid>", chartID)
         
         if diff == 'ult':
             charturl = charturl.replace("mst.png", f"{diff}.png").replace("<gen>", diff)
@@ -179,23 +177,23 @@ class ChartUtil:
             if not os.path.exists(img_path):
                 print(f"[ChunithmUtil] 图片不存在：{img_path}")
                 return
-            img = PIL.Image.open(img_path).convert("RGBA")
+            img = Image.open(img_path).convert("RGBA")
             imgs.append(img)
         img1, img2, img3 = imgs
         try:
             if not (img1.size == img2.size == img3.size):   # 以最小宽高为准裁剪图片
                 min_width = min(img1.size[0], img2.size[0], img3.size[0])
                 min_height = min(img1.size[1], img2.size[1], img3.size[1])
-                img1 = img1.crop((0, 0, min_width, min_height)).resize((width, height), PIL.Image.ANTIALIAS)
-                img2 = img2.crop((0, 0, min_width, min_height)).resize((width, height), PIL.Image.ANTIALIAS)
-                img3 = img3.crop((0, 0, min_width, min_height)).resize((width, height), PIL.Image.ANTIALIAS)
+                img1 = img1.crop((0, 0, min_width, min_height)).resize((min_width, min_height), Image.Resampling.LANCZOS)
+                img2 = img2.crop((0, 0, min_width, min_height)).resize((min_width, min_height), Image.Resampling.LANCZOS)
+                img3 = img3.crop((0, 0, min_width, min_height)).resize((min_width, min_height), Image.Resampling.LANCZOS)
             
             width, height = img1.size
-            new_image = PIL.Image.new("RGBA", (width, height), color = (0, 0, 0, 255))
+            new_image = Image.new("RGBA", (width, height), color = (0, 0, 0, 255))
             
-            new_image = PIL.Image.alpha_composite(new_image, img2)
-            new_image = PIL.Image.alpha_composite(new_image, img1)
-            new_image = PIL.Image.alpha_composite(new_image, img3)
+            new_image = Image.alpha_composite(new_image, img2)
+            new_image = Image.alpha_composite(new_image, img1)
+            new_image = Image.alpha_composite(new_image, img3)
             
             new_image.save(save_path)
             print("[ChunithmUtil] 铺面合成成功")
