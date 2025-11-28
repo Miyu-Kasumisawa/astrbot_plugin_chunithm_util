@@ -37,6 +37,13 @@ os.environ.pop("HTTPS_PROXY", None)
 os.environ.pop("all_proxy", None)
 os.environ.pop("ALL_PROXY", None)
 
+#模糊搜索音乐自定义筛选函数
+class MusicSearchFilter(filter.CustomFilter):
+    def filter(self ,event:AstrMessageEvent, cfg: AstrBotConfig) -> bool:
+        if (re.match(r"^(.+)是什么歌$",event.message_str)):
+            return True
+        else:
+            return False
 
 # 注册插件
 @register("ChunithmUtil", "Amethyst", "集成多项Chunithm实用功能的AstrBot插件🧩", "1.1")
@@ -178,16 +185,10 @@ class ChunithmUtilPlugin(Star):
         queryGuess(event, arg, "name", self.guessgame)
 
     
-    #模糊搜索音乐自定义筛选函数
-    @staticmethod
-    def MusicSearchFilterFunc(event:AstrMessageEvent, cfg: AstrBotConfig) -> bool:
-        if (re.match(r"^(.+)是什么歌$",event.message_str)):
-            return True
-        else:
-            return False
+    
 
     #模糊搜索音乐
-    @filter.custom_filter(MusicSearchFilterFunc)
+    @filter.custom_filter(MusicSearchFilter)
     async def MusicSearch(self, event:AstrMessageEvent):
         match = re.search(r"^(.+)是什么歌$", event.message_str)
         if (match == None):
