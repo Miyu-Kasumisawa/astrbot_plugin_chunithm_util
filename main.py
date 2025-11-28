@@ -143,17 +143,17 @@ class ChunithmUtilPlugin(Star):
     #帮助
     @chu.command("help")
     async def chuhelp(self, event:AstrMessageEvent):
-        queryHelp(event)
+        yield queryHelp(event)
 
     #根据定数筛选
     @chu.command("lv")
     async def chulv(self, event:AstrMessageEvent, level:str):
-        await queryLevel(event, level)
+        yield queryLevel(event, level)
 
     #更新数据
     @chu.command("update")
     async def chuupdate(self, event:AstrMessageEvent):
-        queryUpdate(event)
+        yield queryUpdate(event)
 
     #猜歌管理
     @chu.command("guess")
@@ -166,23 +166,23 @@ class ChunithmUtilPlugin(Star):
     #猜歌提示
     @chu.command("hint")
     async def chuhint(self, event:AstrMessageEvent):
-        queryGuess(event, "", "hint", self.guessgame)
+        yield queryGuess(event, "", "hint", self.guessgame)
 
     #迁移游玩数据
     @chu.command("copy")
     async def chucopy(self, event:AstrMessageEvent, server:str):
-        queryCopy(event,server)
+        yield queryCopy(event,server)
 
     #迁移游玩数据
     @chu.command("bind")
     async def chubind(self, event:AstrMessageEvent, server:str, token:str):
-        queryBind(event,server,token)
+        yield queryBind(event,server,token)
 
 
     #猜歌
     @filter.command("guess")
     async def guess(self, event:AstrMessageEvent, arg:str):
-        queryGuess(event, arg, "name", self.guessgame)
+        yield queryGuess(event, arg, "name", self.guessgame)
 
     
     
@@ -194,60 +194,60 @@ class ChunithmUtilPlugin(Star):
         if (match == None):
             yield event.plain_result("ChunithmUtil:查询条件不能为空")
         else:
-            querySong(event, match.group(1))
+            yield querySong(event, match.group(1))
 
     #随机音乐
     @filter.command("chu随机一曲",alias={"chu随机"})
     async def RandomMusic(self, event:AstrMessageEvent):
-        queryRdnSong(event)
+        yield queryRdnSong(event)
         
     #添加别名
     @filter.event_message_type(filter.EventMessageType.GROUP_MESSAGE)
     @filter.command("chuset",alias={"添加别名"})
     async def AddAlias(self, event:AstrMessageEvent, cid:str, alias:str):
-        queryAddAlias(event, cid, alias)
+        yield queryAddAlias(event, cid, alias)
 
     #查询别名
     @filter.command("alias",alias={"别名"})
     async def GetAlias(self, event:AstrMessageEvent, condition:str):
-        queryGetAlias(event, condition)
+        yield queryGetAlias(event, condition)
 
     #查询容错
     @filter.command("churc",alias={"chu容错"})
     async def Tolerance(self, event:AstrMessageEvent, name:str, difficulty:str):
-        queryTolerance(event, name, difficulty)
+        yield queryTolerance(event, name, difficulty)
 
     #查询谱面
     @filter.event_message_type(filter.EventMessageType.GROUP_MESSAGE)
     @filter.command("chuchart")
     async def ChuChart(self, event:AstrMessageEvent, name:str, difficulty:str):
-        queryChart(event, name, difficulty)
+        yield queryChart(event, name, difficulty)
 
     #查询WE谱面
     @filter.event_message_type(filter.EventMessageType.GROUP_MESSAGE)
     @filter.command("wechart")
     async def WeChart(self, event:AstrMessageEvent, name:str, type:str):
-        queryChartWE(event, name, type)
+        yield queryChartWE(event, name, type)
 
     #查询曲师
     @filter.command("chuqs",alias={"chu曲师"})
     async def ChuArtist(self, event:AstrMessageEvent, artist:str):
-        queryArtist(event, artist)
+        yield queryArtist(event, artist)
 
     #更新分数
     @filter.command("update")
     async def UpdateScore(self, event:AstrMessageEvent, score: int, name: str, difficulty: str):
-        queryUpdScore(event, score, name, difficulty)
+        yield queryUpdScore(event, score, name, difficulty)
 
     #b30
     @filter.command("b30")
     async def b30(self, event:AstrMessageEvent, arg:str):
-        queryQueryBest(event, arg, "30")
+        yield queryQueryBest(event, arg, "30")
 
     #b50
     @filter.command("b50")
     async def b50(self, event:AstrMessageEvent, arg:str):
-        queryQueryBest(event, arg, "50")
+        yield queryQueryBest(event, arg, "50")
 
     """
     @handler(GroupMessageReceived)
