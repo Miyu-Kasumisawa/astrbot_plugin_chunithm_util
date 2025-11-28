@@ -3,4 +3,4 @@ display_name: ChunithmUtil # 用于展示的名字，可以是方便人类阅读
 desc: 集成多项Chunithm实用功能的AstrBot插件(移植自LangBot插件：https://github.com/AmethystTim/ChunithmUtil) # 插件简短描述
 version: v1.1 # 插件版本号。格式：v1.1.1 或者 v1.1
 author: Amethyst # 作者
-repo: https://github.com/Soulter/helloworld # 插件的仓库地址
+repo: https://github.com/Miyu-Kasumisawa/astrbot_plugin_chunithm_util # 插件的仓库地址
