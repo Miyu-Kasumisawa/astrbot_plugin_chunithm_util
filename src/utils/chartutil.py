@@ -38,7 +38,7 @@ class ChartUtil:
             if len(res) > 0:
                 id = list(f.keys())[list(f.values()).index(res[0])]
                 return id
-        return None
+        return None # type: ignore
     
     def getChartGen(self, chartID: str) -> str:
         '''获取谱面版本ID

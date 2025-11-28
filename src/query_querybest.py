@@ -12,7 +12,7 @@ from astrbot.api.star import Context, Star, register
 from astrbot.api import logger, AstrBotConfig
 import astrbot.api.message_components as Comp
 
-from ..config import Config
+from ..main import Config
 from .query_song import searchSong
 from .utils.songutil import *
 from .utils.apicaller import *
@@ -232,7 +232,7 @@ def renderCardHTML(records: list[tuple]):
     html.append('</div>')
     return "\n".join(html)
 
-def renderBestHTML(card_html: str, best30: float, username: str="CHUNITHMCHUNITHMCHUNITHM", avatar: str=None):
+def renderBestHTML(card_html: str, best30: float, username: str="CHUNITHMCHUNITHMCHUNITHM", avatar: str=None): # type: ignore
     '''渲染Best30HTML'''
     with open(TEMPLATE_PATH, 'r', encoding='utf-8'):
         template = Template(open(TEMPLATE_PATH, 'r', encoding='utf-8').read())
@@ -283,7 +283,7 @@ async def convertHTMLtoIMG(html: str, output_path: str, width=2230, height=720, 
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
         page = await browser.new_page(viewport={'width': width, 'height': height})
-        await page.set_content(html, wait_until=wait_until)
+        await page.set_content(html, wait_until=wait_until) # type: ignore
         await page.screenshot(path=output_path, full_page=True)
         await browser.close()
 
@@ -390,7 +390,7 @@ async def queryBest30(event: AstrMessageEvent, user_id: str, use_simple=False):
                 yield event.chain_result([Comp.Plain(f"生成Best30图表失败，{e}")])
     except sqlite3.Error as e:
         print(e)
-        return -1, f"查询失败，{e}"
+        yield -1, f"查询失败，{e}"
 
 async def queryQueryBest(event: AstrMessageEvent, arg: str, pattern: str):
     '''查询最佳
@@ -408,7 +408,8 @@ async def queryQueryBest(event: AstrMessageEvent, arg: str, pattern: str):
     match pattern:
         case '30':
             yield event.plain_result(f"正在查询Best30...")
-            await queryBest30(event, user_id, use_simple=use_simple)
+            async for _ in queryBest30(event, user_id, use_simple=use_simple):
+                pass
         case '50':
             yield event.plain_result(f"前面的区域以后再探索吧！")
         case _:

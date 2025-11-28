@@ -8,7 +8,7 @@ from astrbot.api.star import Context, Star, register
 from astrbot.api import logger, AstrBotConfig
 import astrbot.api.message_components as Comp
 
-from ..config import Config
+from ..main import Config
 from .query_song import searchSong
 from .utils.songutil import *
 
@@ -35,10 +35,10 @@ class LXHandler:
         try:
             with open(LX_JSON_PATH, 'w') as f:
                 json.dump({'users': users}, f, indent=4)
-            return 0
+            return
         except Exception as e:
             yield self.event.plain_result(f'写入用户信息失败：{e}')
-            return -1
+            return
     
     def checkIsBind(self, users: dict):
         return self.user_id in users.keys()
@@ -112,7 +112,8 @@ async def queryCopy(event: AstrMessageEvent, server: str):
     match server:
         case 'lx':
             lx = LXHandler(event)
-            await lx.copyLXRecord()
+            async for _ in lx.copyLXRecord():
+                pass
         case 'rin':
             yield event.plain_result(f"暂不支持{server}服务器")
             return

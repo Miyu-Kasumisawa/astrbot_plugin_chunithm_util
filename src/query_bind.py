@@ -7,7 +7,7 @@ from astrbot.api.star import Context, Star, register
 from astrbot.api import logger, AstrBotConfig
 import astrbot.api.message_components as Comp
 
-from ..config import Config
+from ..main import Config
 from .utils.songutil import *
 from .utils.apicaller import *
 
@@ -33,22 +33,25 @@ class LXQueryBind():
         try:
             with open(LX_JSON_PATH, 'w') as f:
                 json.dump({'users': users}, f, indent=4)
-            return 0
+            yield 0
+            return
         except Exception as e:
             yield self.event.plain_result(f'写入失败：{e}')
-            return -1
+            return
     
     async def bindAccount(self, token: str):
         users = await self.readUsersJson()
         # 检查是否已绑定
         if self.checkIsBind(users):
             users[self.user_id] = token
-            await self.writeUsersJson(users)
+            async for _ in self.writeUsersJson(users):
+                pass
             yield self.event.plain_result('已将原TOKEN替换为新TOKEN，请及时撤回个人TOKEN')
             return
         # 绑定账号
         users[self.user_id] = token
-        await self.writeUsersJson(users)
+        async for _ in self.writeUsersJson(users):
+            pass
         yield self.event.plain_result('绑定成功，请及时撤回个人TOKEN')
 
 class RinQueryBind():
@@ -69,22 +72,24 @@ class RinQueryBind():
         try:
             with open(RIN_JSON_PATH, 'w') as f:
                 json.dump({'users': users}, f, indent=4)
-            return 0
+            yield 0
+            return
         except Exception as e:
             yield self.event.plain_result(f'写入失败：{e}')
-            return -1
+            return
     
     async def bindAccount(self, token: str):
         users = await self.readUsersJson()
         # 检查是否已绑定
         if self.checkIsBind(users):
             users[self.user_id] = token
-            await self.writeUsersJson(users)
+            async for _ in self.writeUsersJson(users):
+                pass
             yield self.event.plain_result('已将原卡号替换为新卡号，请及时撤回个人卡号')
             return
         # 绑定账号
         users[self.user_id] = token
-        await self.writeUsersJson(users)
+        await self.writeUsersJson(users).__anext__()
         yield self.event.plain_result('绑定成功，请及时撤回个人卡号')
 
 async def queryBind(event: AstrMessageEvent, server: str, token: str):
@@ -95,13 +100,14 @@ async def queryBind(event: AstrMessageEvent, server: str, token: str):
                 await event.reply(MessageChain([Plain(f"请输入{server}服务器的token")]))
                 return
             lqb = LXQueryBind(event)
-            await lqb.bindAccount(token)
+            await lqb.bindAccount(token).__anext__()
         case 'rin':
             if token is None:
                 await event.reply(MessageChain([Plain(f"请输入{server}服务器的卡号")]))
                 return
             rqb = RinQueryBind(event)
-            await rqb.bindAccount(token)
+            async for _ in rqb.bindAccount(token):
+                pass
         case _:
             yield event.plain_result(f"未知服务器{server}")
             return

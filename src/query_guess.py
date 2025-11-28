@@ -8,7 +8,7 @@ from astrbot.api.star import Context, Star, register
 from astrbot.api import logger, AstrBotConfig
 import astrbot.api.message_components as Comp
 
-from ..config import Config
+from ..main import Config
 from .query_song import searchSong
 from .utils.songutil import SongUtil
 from .utils.guessgame import GuessGame
@@ -106,10 +106,10 @@ async def queryGuess(event: AstrMessageEvent, arg: str, pattern: str, guessgame:
                     song = s
                     break
             songutil = SongUtil()
-            songutil.checkIsHit(Config.COVER_URL, song.get('img'))
-            img_component = Comp.Image(os.path.join(COVER_CACHE_DIR, song.get('img') + ".webp"))
+            songutil.checkIsHit(Config.COVER_URL, song.get('img')) # type: ignore
+            img_component = Comp.Image(os.path.join(COVER_CACHE_DIR, song.get('img') + ".webp")) # type: ignore
             yield event.chain_result([
-                Comp.Plain(f"好像没人猜出来捏，正确答案为：\nc{true_index} - {song.get('title')}"),
+                Comp.Plain(f"好像没人猜出来捏，正确答案为：\nc{true_index} - {song.get('title')}"), # type: ignore
                 img_component,
                 Comp.Plain(f"可以顺手使用“chuset c{true_index} [别名]”为该歌曲添加别名，方便以后的猜歌")
             ])

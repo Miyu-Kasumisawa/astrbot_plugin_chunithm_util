@@ -29,12 +29,12 @@ def mapping_we():
     for a in soup.find_all("a", href=pattern):
         # <a href="/chunithm/end/01041end.htm"><img src="/chunithm/chfiles/chlv/star_shou2.png"/></a>
         id_index = a['href']
-        endpoint = a.find("img")["src"]
+        endpoint = a.find("img")["src"] # type: ignore
         
-        m = re.search(r'/([^/]+)\.htm$', id_index)
+        m = re.search(r'/([^/]+)\.htm$', id_index) # type: ignore
         id_index = m.group(1) if m else None
         
-        m = re.search(r'/([^/]+)\.png$', endpoint)
+        m = re.search(r'/([^/]+)\.png$', endpoint) # type: ignore
         endpoint = m.group(1) if m else None
         
         links.append({id_index: endpoint})

@@ -3,6 +3,8 @@ import os
 import re
 import requests
 
+from ...config import Config
+
 class SongUtil:
     def __init__(self):
         self.diff2index = {
@@ -36,7 +38,7 @@ class SongUtil:
                 for alias in self.alias4diff[keys]:
                     if alias == difficulty.lower():
                         return self.diff2index[keys]
-        return None
+        return None # type: ignore
     
     def getIndex2Diff(self, index: int) -> str:
         '''获取索引对应的难度
@@ -50,7 +52,7 @@ class SongUtil:
         for keys in self.diff2index.keys():
             if self.diff2index[keys] == index:
                 return keys
-        return None
+        return None # type: ignore
     
     def getArtists(self, songs: list) -> list: #返回类型疑似有误，由str修改为list
         '''获取所有曲师构成的列表
@@ -149,11 +151,11 @@ class SongUtil:
         '''
         index = self.getDiff2Index(difficulty)
         if index is None:
-            return None
+            return None # type: ignore
         total_score = 10_10000  # 理论值分数
         total_notes = song.get('notes')
-        justice_loss = 0.01 * (total_score / total_notes)    # 小J损失分数
-        attack_loss = (50/101) * (total_score / total_notes)    # attack损失分数
+        justice_loss = 0.01 * (total_score / total_notes)    # type: ignore # 小J损失分数
+        attack_loss = (50/101) * (total_score / total_notes)    # type: ignore # attack损失分数
         # 鸟容错计算
         _7500_loss = 2500 
         _7500_max_attack_num = _7500_loss // attack_loss
@@ -187,7 +189,7 @@ class SongUtil:
         available_aliases = []      # 别名添加成功列表
         unavailable_aliases = []    # 别名添加失败列表
         aliases_to_add = list(set(aliases_to_add))
-        NEW_ALIAS_PATH = os.path.join(os.path.dirname(__file__), '..', '..', os.getenv("ALIAS_PATH"))
+        NEW_ALIAS_PATH = os.path.join(Config.DATA_PATH, Config.ALIAS_PATH)
         for song_aliases in alias_for_songs:
             print(f"song_aliases is {song_aliases}")
             if song_aliases.get('cid') == cid:
@@ -212,11 +214,11 @@ class SongUtil:
         unavailable_aliases = []
         for alias in aliases_to_add:
             if not alias in song_aliases.get('aliases'): 
-                song_aliases.get('aliases').append(alias)
+                song_aliases.get('aliases').append(alias) # type: ignore
                 available_aliases.append(alias)
             else:
                 unavailable_aliases.append(alias)
-        alias_for_songs.append(song_aliases)
+        alias_for_songs.append(song_aliases) # type: ignore
         
         with open(NEW_ALIAS_PATH, "w", encoding="utf-8") as file:
             json.dump({"songs": alias_for_songs}, file, indent=4, ensure_ascii=False)

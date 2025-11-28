@@ -63,12 +63,12 @@ class WEChartUtil:
         with open(ID2NAME_PATH, "r", encoding="utf-8") as f:
             f = json.load(f)
             searcher = Searcher()
-            res = searcher.generalFuzzySearch(song.get("title"), list(f.values()))
+            res = searcher.generalFuzzySearch(song.get("title"), list(f.values())) # type: ignore
             if len(res) > 0:
                 id = list(f.keys())[list(f.values()).index(res[0])]
                 id = re.sub(r'end.*', '', id)
                 return id
-        return None
+        return None # type: ignore
     
     def extractDiff(self, raw_value: str) -> int:
         '''
@@ -146,7 +146,7 @@ class WEChartUtil:
             [谱面URL, 背景URL, 小节数URL]
         '''
         chartid = re.sub(r'end.*', '', weprefix)
-        charturl = os.getenv("WECHART_JACKET_URL").replace("<weprefix>", weprefix) #？？？
+        charturl = os.getenv("WECHART_JACKET_URL").replace("<weprefix>", weprefix) # type: ignore #？？？
         bgurl = Config.CHART_BG_URL.replace("<chartid>", chartid)
         barurl = Config.CHART_BAR_URL.replace("<chartid>", chartid)
         
